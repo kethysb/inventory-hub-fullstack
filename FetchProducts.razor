@@ -1,0 +1,71 @@
+@page "/fetchproducts"
+@using System.Text.Json
+@using InventoryHub.Shared.Models
+@using InventoryHub.Client.Services
+@inject ProductCacheService ProductService
+
+<PageTitle>InventoryHub — Product Catalog</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3>InventoryHub Product List</h3>
+    <button class="btn btn-outline-primary btn-sm" @onclick="() => LoadProductsAsync(true)">Refresh Inventory</button>
+</div>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+}
+else if (products is null)
+{
+    <p><em>Loading inventory from Minimal API...</em></p>
+}
+else if (products.Length == 0)
+{
+    <div class="alert alert-info">No products found in inventory.</div>
+}
+else
+{
+    <ul class="list-group">
+        @foreach (var product in products)
+        {
+            <li @key="product.Id" class="list-group-item d-flex justify-content-between align-items-center">
+                <div>
+                    <strong>@product.Name</strong>
+                    <span class="badge bg-secondary ms-2">@product.Category.Name</span>
+                </div>
+                <div>
+                    <span class="me-3">$@product.Price.ToString("F2")</span>
+                    <span class="badge bg-success">Stock: @product.Stock</span>
+                </div>
+            </li>
+        }
+    </ul>
+}
+
+@code {
+    private ProductDto[]? products;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync() => await LoadProductsAsync(false);
+
+    private async Task LoadProductsAsync(bool forceRefresh)
+    {
+        errorMessage = null;
+        try
+        {
+            products = await ProductService.GetProductsAsync(forceRefresh);
+        }
+        catch (TaskCanceledException)
+        {
+            errorMessage = "Request timed out while loading products from the server.";
+        }
+        catch (HttpRequestException ex)
+        {
+            errorMessage = $"API connection error: {ex.Message}";
+        }
+        catch (JsonException ex)
+        {
+            errorMessage = $"Invalid JSON payload received from API: {ex.Message}";
+        }
+    }
+}
